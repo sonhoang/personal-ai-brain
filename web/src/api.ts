@@ -82,6 +82,27 @@ export async function downloadBackup(): Promise<void> {
 }
 
 /** Replaces brain.sqlite + uploads with a ZIP from GET /management/export/backup. Destructive. */
+export async function downloadLibraryExport(workspaceId: string, format: "json" | "markdown"): Promise<void> {
+  const q = new URLSearchParams({ workspace_id: workspaceId, format });
+  const r = await fetch(`/api/management/export/library?${q}`, {
+    headers: { Authorization: "Bearer " + getToken() }
+  });
+  if (!r.ok) {
+    const data = (await r.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || r.statusText || "Export failed");
+  }
+  const blob = await r.blob();
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = u;
+  a.download =
+    format === "json"
+      ? `brain-library-${workspaceId}.json`
+      : `brain-library-${workspaceId}.zip`;
+  a.click();
+  URL.revokeObjectURL(u);
+}
+
 export async function uploadBackupRestore(file: File): Promise<void> {
   const fd = new FormData();
   fd.append("file", file);

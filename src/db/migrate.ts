@@ -10,6 +10,11 @@ export function runMigrations(db: Database.Database): void {
   if (ver < 3) {
     migrateV3(db);
     db.pragma("user_version = 3");
+    ver = 3;
+  }
+  if (ver < 4) {
+    migrateV4(db);
+    db.pragma("user_version = 4");
   }
 }
 
@@ -95,4 +100,26 @@ function migrateV3(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_saved_searches_ws ON saved_searches(workspace_id);
   `);
+}
+
+function migrateV4(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chunk_meta (
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      page INTEGER,
+      PRIMARY KEY (source_type, source_id, chunk_index)
+    );
+  `);
+
+  const docCols = db.prepare(`PRAGMA table_info(documents)`).all() as { name: string }[];
+  if (!docCols.some(c => c.name === "chat_instruction")) {
+    db.exec(`ALTER TABLE documents ADD COLUMN chat_instruction TEXT`);
+  }
+
+  const noteCols = db.prepare(`PRAGMA table_info(notes)`).all() as { name: string }[];
+  if (!noteCols.some(c => c.name === "chat_instruction")) {
+    db.exec(`ALTER TABLE notes ADD COLUMN chat_instruction TEXT`);
+  }
 }

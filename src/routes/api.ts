@@ -8,6 +8,7 @@ import { searchRouter } from "../modules/search/search.routes";
 import { workspacesRouter } from "../modules/workspaces/workspaces.routes";
 import { chatThreadsRouter } from "../modules/chat_threads/chat_threads.routes";
 import { savedSearchesRouter } from "../modules/saved_searches/saved_searches.routes";
+import { artifactsRouter } from "../modules/artifacts/artifacts.routes";
 
 export const apiRouter = Router();
 
@@ -20,3 +21,4 @@ apiRouter.use("/search", searchRouter);
 apiRouter.use("/chat-threads", chatThreadsRouter);
 apiRouter.use("/saved-searches", savedSearchesRouter);
 apiRouter.use("/management", managementRouter);
+apiRouter.use("/artifacts", artifactsRouter);

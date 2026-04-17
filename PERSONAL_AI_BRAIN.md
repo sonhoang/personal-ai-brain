@@ -82,17 +82,19 @@ The UI is **React + TypeScript** under **`web/`** (Vite). The API remains usable
 
 ## Environment
 
-See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LLM_EMBEDDING_MODEL`** (semantic rerank), **`CHAT_CONTEXT_CHUNKS`**, **`FTS_CANDIDATE_CHUNKS`**, **`MAX_UPLOAD_MB`**, **`BRAIN_MAX_RESTORE_ZIP_MB`**, **`NOTE_TEMPLATE`**, **`API_RATE_*`**, **`PORT`**, **`DATA_DIR`**, **`BRAIN_SKIP_LOCK`**.
+See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LLM_EMBEDDING_MODEL`** (semantic rerank), **`CHAT_CONTEXT_CHUNKS`**, **`FTS_CANDIDATE_CHUNKS`**, **`MAX_UPLOAD_MB`**, **`BRAIN_MAX_RESTORE_ZIP_MB`**, **`BRAIN_WATCH_DIRS`**, **`BRAIN_WATCH_WORKSPACE_ID`**, **`NOTE_TEMPLATE`**, **`API_RATE_*`**, **`PORT`**, **`DATA_DIR`**, **`BRAIN_SKIP_LOCK`**.
 
 ## API (all under `/api`, Bearer required)
 
 - `GET /api/management/summary` — counts; **`llmConfigured`**, **`embeddingConfigured`**, **`dataDir`**.
 - `GET /api/management/export/backup` — downloads **`brain.sqlite`** + **`uploads/`** as a ZIP.
+- `GET /api/management/export/library?workspace_id=&format=json|markdown` — portable **JSON** (notes + document text) or **ZIP** of Markdown files (+ `manifest.json`).
 - `POST /api/management/import/backup` — multipart **`file`** (`.zip` from export) + **`confirm_replace=yes`**; replaces DB + uploads (destructive). Idle the app first; optional **`BRAIN_MAX_RESTORE_ZIP_MB`** (default 512).
 - `GET|POST|PATCH|DELETE /api/workspaces` — notebooks; delete reassigns content to **`default`**.
-- `GET|POST|PATCH|DELETE /api/notes` — query **`workspace_id`**, **`inbox=1`**; **`POST /notes/daily`**, **`POST /notes/quick`**; **`GET /notes/:id/versions`**, **`POST /notes/:id/restore_version`**.
-- `GET|POST|DELETE /api/documents` — `POST` multipart **`file`** + **`workspace_id`**; types include `.pdf`, `.docx`, `.html`, `.rtf`. **`POST /documents/url`** JSON `{ url, workspace_id }`. **`POST /documents/zip`** multipart ZIP.
-- `GET /api/search?q=&limit=&workspace_id=` — FTS hits; each hit includes **`excerpt_html`** (highlighted) and **`excerpt`**.
+- `GET|POST|PATCH|DELETE /api/notes` — query **`workspace_id`**, **`inbox=1`**; **`POST /notes/daily`**, **`POST /notes/quick`**; **`GET /notes/:id/versions`**, **`POST /notes/:id/restore_version`**. **`PATCH`** may set **`chat_instruction`** (used when this note is chat-scoped).
+- `GET|POST|PATCH|DELETE /api/documents` — `POST` multipart **`file`** + **`workspace_id`**; types include `.pdf`, `.docx`, `.html`, `.rtf`. **`POST /documents/url`** JSON `{ url, workspace_id }`. **`POST /documents/zip`** multipart ZIP. **`PATCH /documents/:id`** JSON **`{ chat_instruction }`**.
+- `GET /api/search?q=&limit=&workspace_id=` — FTS hits; **`excerpt_html`**, **`excerpt`**, **`page`** (PDF when known). Params: **`type`**=`note`|`document`, **`sort`**=`recency`, **`tag`**, **`inbox`**, **`date_from`**, **`date_to`** (ISO).
+- `POST /api/artifacts/generate` — JSON **`{ workspace_id, kind }`**, **`kind`** = **`outline` \| `flashcards` \| `quiz` \| `slide_bullets`** (requires LLM).
 - `GET /api/chat-threads?workspace_id=` · `POST /` · `GET /:id/messages` · `PATCH /:id` · `DELETE /:id`.
 - `GET /api/saved-searches?workspace_id=` · `POST /` · `DELETE /:id`.
 - `POST /api/chat` — body includes **`message`**, optional **`workspace_id`**, **`thread_id`**, **`focus`**. Appends to thread when **`thread_id`** set.
@@ -102,7 +104,7 @@ See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LL
 
 ## Roadmap (from original spec)
 
-Later: OCR, cloud connectors, **`.doc` / Office** beyond current set, true PWA offline, fuller a11y/i18n. Current stack: **workspaces**, URL/ZIP ingest, **HTML/RTF**, optional **embedding rerank**, **chat threads** + **streaming**, backup export/**restore**, **saved searches** (API + UI), **backlinks**, rate limits — see **`development.md`**.
+Later: OCR, cloud connectors, **`.doc` / Office** beyond current set, true PWA offline, fuller a11y/i18n. Current stack: **workspaces**, URL/ZIP ingest, **HTML/RTF**, optional **embedding rerank**, **chat threads** + **streaming**, backup export/**restore**, **library export** (JSON / Markdown ZIP), **saved searches** + filters, **PDF page** in citations, **chat hints** per note/document, **artifacts**, optional **folder watch**, **backlinks**, rate limits — see **`development.md`**.
 
 ## Migration from old spec
 

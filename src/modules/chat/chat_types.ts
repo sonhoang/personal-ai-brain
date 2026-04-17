@@ -6,6 +6,7 @@ export type ChatSource = {
   chunk_index: number;
   label: string;
   excerpt: string;
+  page?: number | null;
 };
 
 export type ChatResult = {

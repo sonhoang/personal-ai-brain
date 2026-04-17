@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, clearToken, uploadDocument, uploadZip, downloadBackup, uploadBackupRestore, getToken } from "./api";
+import {
+  api,
+  clearToken,
+  uploadDocument,
+  uploadZip,
+  downloadBackup,
+  downloadLibraryExport,
+  uploadBackupRestore,
+  getToken
+} from "./api";
 import { extractWikiLinkTargets, mdToHtml } from "./md";
 import type {
   ChatResponse,
@@ -73,6 +82,11 @@ export function Workspace({ onLogout }: Props) {
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [searchSourceType, setSearchSourceType] = useState<"all" | "note" | "document">("all");
+  const [searchSort, setSearchSort] = useState<"rank" | "recency">("rank");
+  const [searchTag, setSearchTag] = useState("");
+  const [noteChatInstr, setNoteChatInstr] = useState("");
+  const [docChatInstr, setDocChatInstr] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -145,16 +159,32 @@ export function Workspace({ onLogout }: Props) {
     }
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
-      api<{ hits: LibrarySearchHit[] }>(
-        `/search?q=${encodeURIComponent(q)}&limit=25&workspace_id=${encodeURIComponent(workspaceId)}`
-      )
+      const p = new URLSearchParams({
+        q,
+        limit: "25",
+        workspace_id: workspaceId
+      });
+      if (searchSourceType !== "all") p.set("type", searchSourceType);
+      if (searchSort === "recency") p.set("sort", "recency");
+      const tag = searchTag.trim();
+      if (tag) p.set("tag", tag);
+      api<{ hits: LibrarySearchHit[] }>(`/search?${p.toString()}`)
         .then(r => setFtsHits(r.hits))
         .catch(() => setFtsHits([]));
     }, 350);
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [filter, workspaceId]);
+  }, [filter, workspaceId, searchSourceType, searchSort, searchTag]);
+
+  useEffect(() => {
+    if (chatScope?.type === "document") {
+      const d = documents.find(x => x.id === chatScope.id);
+      setDocChatInstr(d?.chat_instruction ?? "");
+    } else {
+      setDocChatInstr("");
+    }
+  }, [chatScope, documents]);
 
   const selectThread = useCallback(
     async (tid: string | null) => {
@@ -190,6 +220,7 @@ export function Workspace({ onLogout }: Props) {
     setTitle(n.title || "");
     setBody(n.body || "");
     setTagsStr((n.tags || []).join(", "));
+    setNoteChatInstr(n.chat_instruction ?? "");
     setSaveState("saved");
     setShowHistory(false);
     const v = await api<{ versions: NoteVersion[] }>(`/notes/${id}/versions`).catch(() => ({
@@ -210,7 +241,7 @@ export function Workspace({ onLogout }: Props) {
           .filter(Boolean);
         await api(`/notes/${activeNoteId}`, {
           method: "PATCH",
-          body: { title, body, tags }
+          body: { title, body, tags, chat_instruction: noteChatInstr.trim() || null }
         });
         setSaveState("saved");
         await loadLibrary();
@@ -220,7 +251,7 @@ export function Workspace({ onLogout }: Props) {
         setSaveState("error");
       }
     }, 700);
-  }, [activeNoteId, title, body, tagsStr, loadLibrary]);
+  }, [activeNoteId, title, body, tagsStr, noteChatInstr, loadLibrary]);
 
   useEffect(() => {
     return () => {
@@ -262,7 +293,33 @@ export function Workspace({ onLogout }: Props) {
     setTitle("");
     setBody("");
     setTagsStr("");
+    setNoteChatInstr("");
     await loadLibrary();
+  }
+
+  async function saveDocChatInstr() {
+    if (chatScope?.type !== "document") return;
+    try {
+      await api(`/documents/${chatScope.id}`, {
+        method: "PATCH",
+        body: { chat_instruction: docChatInstr.trim() || null }
+      });
+      await loadLibrary();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function runArtifact(kind: "outline" | "flashcards" | "quiz" | "slide_bullets") {
+    try {
+      const r = await api<{ markdown: string }>("/artifacts/generate", {
+        method: "POST",
+        body: { workspace_id: workspaceId, kind }
+      });
+      setChatMsgs(m => [...m, { kind: "system", md: r.markdown }]);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function restoreVersion(vid: number) {
@@ -544,6 +601,30 @@ export function Workspace({ onLogout }: Props) {
           >
             Backup
           </button>
+          <button
+            type="button"
+            className="btn ghost"
+            title="Export this notebook as JSON (notes + document text)"
+            onClick={() =>
+              downloadLibraryExport(workspaceId, "json").catch(e =>
+                alert(e instanceof Error ? e.message : String(e))
+              )
+            }
+          >
+            Lib JSON
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            title="Export as ZIP of Markdown files"
+            onClick={() =>
+              downloadLibraryExport(workspaceId, "markdown").catch(e =>
+                alert(e instanceof Error ? e.message : String(e))
+              )
+            }
+          >
+            Lib MD
+          </button>
           <button type="button" className="btn ghost" onClick={newDaily}>
             Daily
           </button>
@@ -629,6 +710,45 @@ export function Workspace({ onLogout }: Props) {
             </button>
           </div>
 
+          <div className="source-section search-filters-section">
+            <h3>Search filters</h3>
+            <p className="panel-sub tight">Applies to content search (top bar, 2+ chars).</p>
+            <div className="search-filters-grid">
+              <label className="sf-label">
+                Type
+                <select
+                  value={searchSourceType}
+                  onChange={e =>
+                    setSearchSourceType(e.target.value as "all" | "note" | "document")
+                  }
+                >
+                  <option value="all">All</option>
+                  <option value="note">Notes</option>
+                  <option value="document">Documents</option>
+                </select>
+              </label>
+              <label className="sf-label">
+                Sort
+                <select
+                  value={searchSort}
+                  onChange={e => setSearchSort(e.target.value as "rank" | "recency")}
+                >
+                  <option value="rank">Relevance</option>
+                  <option value="recency">Recent</option>
+                </select>
+              </label>
+              <label className="sf-label sf-tag">
+                Tag
+                <input
+                  placeholder="note tag"
+                  value={searchTag}
+                  onChange={e => setSearchTag(e.target.value)}
+                  aria-label="Filter notes by tag"
+                />
+              </label>
+            </div>
+          </div>
+
           <div className="source-section saved-searches-section">
             <h3>Saved searches</h3>
             <div className="saved-search-toolbar">
@@ -698,7 +818,11 @@ export function Workspace({ onLogout }: Props) {
                     >
                       <span className="title">
                         {h.source_type === "note" ? "📝" : "📄"} {h.label}
-                        <span className="chunk-idx"> · §{h.chunk_index}</span>
+                        <span className="chunk-idx">
+                          {" "}
+                          · §{h.chunk_index}
+                          {h.page != null ? ` · p.${h.page}` : ""}
+                        </span>
                       </span>
                       <span className="meta excerpt-preview">
                         {h.excerpt_html ? (
@@ -788,6 +912,19 @@ export function Workspace({ onLogout }: Props) {
                   value={tagsStr}
                   onChange={e => {
                     setTagsStr(e.target.value);
+                    scheduleSave();
+                  }}
+                />
+              </div>
+              <div className="tags-row chat-instr-row">
+                <label>Chat hint (this note)</label>
+                <textarea
+                  className="chat-hint-input"
+                  placeholder="Optional instructions prepended when this note is in chat scope…"
+                  rows={2}
+                  value={noteChatInstr}
+                  onChange={e => {
+                    setNoteChatInstr(e.target.value);
                     scheduleSave();
                   }}
                 />
@@ -900,15 +1037,45 @@ export function Workspace({ onLogout }: Props) {
               </button>
             ))}
           </div>
+          {llmOn ? (
+            <div className="artifact-bar">
+              <span className="artifact-bar-label">Artifacts</span>
+              <button type="button" className="btn ghost tiny" onClick={() => void runArtifact("outline")}>
+                Outline
+              </button>
+              <button type="button" className="btn ghost tiny" onClick={() => void runArtifact("flashcards")}>
+                Cards
+              </button>
+              <button type="button" className="btn ghost tiny" onClick={() => void runArtifact("quiz")}>
+                Quiz
+              </button>
+              <button type="button" className="btn ghost tiny" onClick={() => void runArtifact("slide_bullets")}>
+                Slides
+              </button>
+            </div>
+          ) : null}
           <p className="panel-sub">Grounded on this notebook; chips = sources.</p>
           {chatScope ? (
             <div className="chat-scope-banner">
-              <span>
-                Scoped to: <strong>{chatScope.label}</strong>
-              </span>
-              <button type="button" className="btn ghost tiny" onClick={() => setChatScope(null)}>
-                All sources
-              </button>
+              <div className="chat-scope-top">
+                <span>
+                  Scoped to: <strong>{chatScope.label}</strong>
+                </span>
+                <button type="button" className="btn ghost tiny" onClick={() => setChatScope(null)}>
+                  All sources
+                </button>
+              </div>
+              {chatScope.type === "document" ? (
+                <label className="scope-doc-hint">
+                  <span>Chat hint for this document</span>
+                  <textarea
+                    rows={2}
+                    value={docChatInstr}
+                    onChange={e => setDocChatInstr(e.target.value)}
+                    onBlur={() => void saveDocChatInstr()}
+                  />
+                </label>
+              ) : null}
             </div>
           ) : null}
           <div className="chat-thread">
@@ -932,6 +1099,7 @@ export function Workspace({ onLogout }: Props) {
                         {msg.sources.map((s, j) => (
                           <span key={j} className="chip" title={s.excerpt}>
                             {s.label} · §{s.chunk_index}
+                            {s.page != null ? ` · p.${s.page}` : ""}
                           </span>
                         ))}
                       </div>

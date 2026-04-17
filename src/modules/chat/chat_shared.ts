@@ -1,4 +1,5 @@
 import { config } from "../../config";
+import { getDb } from "../../db/database";
 import { searchChunks, type ChunkHit } from "../indexing/indexing.service";
 import { annotateChunkHits } from "../search/search.service";
 import { rerankChunkHits } from "../indexing/embedding.service";
@@ -10,6 +11,20 @@ export type PreparedChat = {
   labeled: Array<ChunkHit & { label: string }>;
   hits: ChunkHit[];
 };
+
+function loadFocusInstruction(focus: ChatFocus): string {
+  const db = getDb();
+  if (focus.source_type === "document") {
+    const r = db
+      .prepare(`SELECT chat_instruction FROM documents WHERE id = ?`)
+      .get(focus.source_id) as { chat_instruction: string | null } | undefined;
+    return (r?.chat_instruction || "").trim();
+  }
+  const r = db
+    .prepare(`SELECT chat_instruction FROM notes WHERE id = ?`)
+    .get(focus.source_id) as { chat_instruction: string | null } | undefined;
+  return (r?.chat_instruction || "").trim();
+}
 
 export async function prepareChatContext(
   userMessage: string,
@@ -50,14 +65,19 @@ export async function prepareChatContext(
   const scopeHint = scope
     ? `Retrieval is limited to one ${scope.sourceType} (${scope.sourceId}). If CONTEXT is empty, say that this source had no matching text for the question.`
     : "";
+  const focusInstr =
+    focus && (focus.source_type === "document" || focus.source_type === "note")
+      ? loadFocusInstruction(focus)
+      : "";
   const context =
     hits.length === 0
       ? "(No matching chunks in index — try different keywords or add notes/documents.)"
       : hits
-          .map(
-            (h, i) =>
-              `[#${i + 1} ${h.source_type} ${h.source_id} part ${h.chunk_index}]\n${h.content}`
-          )
+          .map((h, i) => {
+            const loc =
+              h.page != null && Number.isFinite(h.page) ? ` PDF p.${h.page}` : "";
+            return `[#${i + 1} ${h.source_type} ${h.source_id} §${h.chunk_index}${loc}]\n${h.content}`;
+          })
           .join("\n\n---\n\n");
 
   const prior: { role: "user" | "assistant"; content: string }[] = [];
@@ -69,10 +89,14 @@ export async function prepareChatContext(
     }
   }
 
+  const pinned = focusInstr
+    ? `User instructions for this source (follow when consistent with CONTEXT):\n${focusInstr}\n\n`
+    : "";
+
   const messages: PreparedChat["messages"] = [
     {
       role: "system",
-      content: `You are a personal knowledge assistant. Answer using the CONTEXT when it helps. If context is empty or irrelevant, answer from general knowledge and say what is missing from the user's library.${scopeHint ? `\n${scopeHint}` : ""}\n\nCONTEXT:\n${context}`
+      content: `${pinned}You are a personal knowledge assistant. Answer using the CONTEXT when it helps. If context is empty or irrelevant, answer from general knowledge and say what is missing from the user's library.${scopeHint ? `\n${scopeHint}` : ""}\n\nCONTEXT:\n${context}`
     },
     ...prior,
     { role: "user", content: userMessage }
@@ -87,6 +111,7 @@ export function toChatSources(labeled: PreparedChat["labeled"]): ChatSource[] {
     source_id: h.source_id,
     chunk_index: h.chunk_index,
     label: h.label,
-    excerpt: h.content.slice(0, 280) + (h.content.length > 280 ? "…" : "")
+    excerpt: h.content.slice(0, 280) + (h.content.length > 280 ? "…" : ""),
+    page: h.page
   }));
 }

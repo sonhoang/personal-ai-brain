@@ -283,15 +283,97 @@ body {
 
 .chat-scope-banner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px 10px;
   margin: 0 0 10px;
   background: var(--accent-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 0.8rem;
+}
+
+.chat-scope-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scope-doc-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.scope-doc-hint textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.search-filters-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sf-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sf-label select,
+.sf-label input {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sf-tag {
+  grid-column: 1 / -1;
+}
+
+.artifact-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.artifact-bar-label {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.chat-instr-row textarea.chat-hint-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
 }
 
 .search-hits-section h3 {

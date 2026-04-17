@@ -70,10 +70,16 @@ notesRouter.post("/", (req, res) => {
 });
 
 notesRouter.patch("/:id", (req, res) => {
+  const body = req.body as Record<string, unknown> | undefined;
+  const hasInstr = body != null && Object.prototype.hasOwnProperty.call(body, "chat_instruction");
+  const rawInstr = hasInstr ? body!.chat_instruction : undefined;
   const n = notes.updateNote(req.params.id, {
     title: req.body?.title,
     body: req.body?.body,
-    tags: req.body?.tags
+    tags: req.body?.tags,
+    ...(hasInstr
+      ? { chat_instruction: rawInstr == null ? null : String(rawInstr) }
+      : {})
   });
   if (!n) {
     res.status(404).json({ error: "Note not found" });

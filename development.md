@@ -27,13 +27,13 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partial / minimal.
 | URL fetch → document | [x] |
 | ZIP batch import | [x] |
 | Text extract → chunk → FTS index | [x] |
-| **Folder / directory watch** auto-import | [ ] |
+| **Folder / directory watch** auto-import (`BRAIN_WATCH_DIRS`, new files only) | [x] |
 | **Cloud pickers** (Drive, Dropbox, OneDrive, …) | [ ] |
 | **YouTube / podcast / audio** → transcript → index | [ ] |
 | **Email / “send to brain”** ingest | [ ] |
-| Per-source **instructions** / pinned system hints for chat | [ ] |
-| **Generated artifacts**: flashcards, quiz, outline, slide bullets from library | [ ] |
-| **Export** library (Markdown bundle, JSON, not only raw ZIP) | [ ] |
+| Per-source **instructions** / pinned system hints for chat | [x] |
+| **Generated artifacts**: flashcards, quiz, outline, slide bullets from library | [x] |
+| **Export** library (Markdown bundle, JSON, not only raw ZIP) | [x] |
 | **Import restore** from backup ZIP (round-trip: backup → **Restore** in UI + `POST /management/import/backup`) | [x] |
 
 ---
@@ -49,7 +49,7 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partial / minimal.
 | Chat + **thread history** in model context | [x] |
 | **Non-streaming** and **streaming** completion | [x] |
 | Citation chips (label + §) | [x] |
-| **PDF page / location** in citations | [ ] |
+| **PDF page / location** in citations | [x] (re-index PDFs after upgrade; metadata per chunk) |
 | **Reranker** model (cross-encoder) after vector/FTS | [ ] |
 | **Query rewrite** / HyDE / step-back for hard questions | [ ] |
 | Dedicated **“compare these sources”** or **research report** flow (structured UI) | [ ] |
@@ -67,8 +67,8 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partial / minimal.
 | Title/tag sidebar filter | [x] |
 | **Saved searches**: API | [x] |
 | **Saved searches**: in-app UI (save / run / delete) | [x] |
-| **Filters**: date range, type (note/doc), tag-only, inbox-only | [ ] |
-| **Sort** results by recency / source type | [ ] |
+| **Filters**: date range, type (note/doc), tag-only, inbox-only | [~] (type, tag, date range, inbox via API; minimal UI) |
+| **Sort** results by recency / source type | [~] (recency + relevance in API; UI sort control) |
 | **“Similar to this chunk”** (vector neighborhood) | [ ] |
 
 ---
@@ -138,7 +138,7 @@ Legend: `[x]` done · `[ ]` not done · `[~]` partial / minimal.
 
 ## Recently shipped (short)
 
-Workspaces · URL/ZIP · HTML/RTF · embedding rerank · threads · stream · search highlights · wiki · daily/inbox · versions · backup export/import · saved-search UI · backlinks · rate limit · logging · manifest · smoke + CI.
+Workspaces · URL/ZIP · HTML/RTF · embedding rerank · threads · stream · search highlights · wiki · daily/inbox · versions · backup export/import · library JSON/MD export · saved-search UI · search filters/sort · PDF page cites · per-source chat hints · artifacts · folder watch · backlinks · rate limit · logging · manifest · smoke + CI.
 
 ---
 

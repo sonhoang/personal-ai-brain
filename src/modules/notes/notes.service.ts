@@ -12,6 +12,7 @@ export type NoteRow = {
   updated_at: string;
   workspace_id: string;
   inbox: number;
+  chat_instruction: string | null;
   tags?: string[];
 };
 
@@ -46,7 +47,7 @@ function attachTags(row: Omit<NoteRow, "tags">): NoteRow {
 
 export function listNotes(limit = 100, workspaceId?: string, inboxOnly?: boolean): NoteRow[] {
   const db = getDb();
-  let sql = `SELECT id, title, body, created_at, updated_at, workspace_id, inbox FROM notes WHERE 1=1`;
+  let sql = `SELECT id, title, body, created_at, updated_at, workspace_id, inbox, chat_instruction FROM notes WHERE 1=1`;
   const params: unknown[] = [];
   if (workspaceId) {
     sql += ` AND workspace_id = ?`;
@@ -58,14 +59,14 @@ export function listNotes(limit = 100, workspaceId?: string, inboxOnly?: boolean
   sql += ` ORDER BY updated_at DESC LIMIT ?`;
   params.push(limit);
   const rows = db.prepare(sql).all(...params) as Omit<NoteRow, "tags">[];
-  return rows.map(attachTags);
+  return rows.map(attachTags) as NoteRow[];
 }
 
 export function getNote(id: string): NoteRow | undefined {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT id, title, body, created_at, updated_at, workspace_id, inbox FROM notes WHERE id = ?`
+      `SELECT id, title, body, created_at, updated_at, workspace_id, inbox, chat_instruction FROM notes WHERE id = ?`
     )
     .get(id) as Omit<NoteRow, "tags"> | undefined;
   return row ? attachTags(row) : undefined;
@@ -127,7 +128,7 @@ export function createNote(input: {
   const workspaceId = (input.workspace_id || "default").trim() || "default";
   const inbox = input.inbox !== undefined ? (input.inbox ? 1 : 0) : 0;
   db.prepare(
-    `INSERT INTO notes (id, title, body, created_at, updated_at, workspace_id, inbox) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO notes (id, title, body, created_at, updated_at, workspace_id, inbox, chat_instruction) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
   ).run(id, title, body, t, t, workspaceId, inbox);
   setNoteTags(id, input.tags ?? []);
   reindexNote(id, title, body);
@@ -139,31 +140,36 @@ export function createNote(input: {
 
 export function updateNote(
   id: string,
-  input: { title?: string; body?: string; tags?: string[] }
+  input: { title?: string; body?: string; tags?: string[]; chat_instruction?: string | null }
 ): NoteRow | undefined {
   const db = getDb();
   const cur = db
-    .prepare(`SELECT id, title, body FROM notes WHERE id = ?`)
-    .get(id) as { id: string; title: string; body: string } | undefined;
+    .prepare(`SELECT id, title, body, chat_instruction FROM notes WHERE id = ?`)
+    .get(id) as { id: string; title: string; body: string; chat_instruction: string | null } | undefined;
   if (!cur) return undefined;
   const title = input.title !== undefined ? input.title.slice(0, 500) : cur.title;
   const body = input.body !== undefined ? input.body : cur.body;
+  const instr =
+    input.chat_instruction !== undefined ? input.chat_instruction : cur.chat_instruction;
   if (input.title !== undefined || input.body !== undefined) {
     if (title !== cur.title || body !== cur.body) {
       pushNoteVersion(id, cur.title, cur.body);
     }
   }
   const t = nowIso();
-  db.prepare(`UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ?`).run(
+  db.prepare(`UPDATE notes SET title = ?, body = ?, chat_instruction = ?, updated_at = ? WHERE id = ?`).run(
     title,
     body,
+    instr,
     t,
     id
   );
   if (input.tags) setNoteTags(id, input.tags);
-  reindexNote(id, title, body);
-  if (config.embeddingModel) {
-    void indexEmbeddingsForNote(id, title, body).catch(() => {});
+  if (input.title !== undefined || input.body !== undefined) {
+    reindexNote(id, title, body);
+    if (config.embeddingModel) {
+      void indexEmbeddingsForNote(id, title, body).catch(() => {});
+    }
   }
   return getNote(id);
 }

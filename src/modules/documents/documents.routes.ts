@@ -100,6 +100,21 @@ documentsRouter.get("/:id", (req, res) => {
   res.json(d);
 });
 
+documentsRouter.patch("/:id", (req, res) => {
+  const body = req.body as Record<string, unknown> | undefined;
+  if (!body || !Object.prototype.hasOwnProperty.call(body, "chat_instruction")) {
+    res.status(400).json({ error: "chat_instruction required (string or null)" });
+    return;
+  }
+  const raw = body.chat_instruction;
+  const d = docs.updateDocumentChatInstruction(req.params.id, raw == null ? null : String(raw));
+  if (!d) {
+    res.status(404).json({ error: "Document not found" });
+    return;
+  }
+  res.json(d);
+});
+
 documentsRouter.post("/", upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Missing file field (multipart name: file)" });

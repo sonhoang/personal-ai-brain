@@ -39,6 +39,20 @@ managementRouter.get("/export/backup", (_req, res) => {
   management.streamDataBackup(res);
 });
 
+managementRouter.get("/export/library", (req, res) => {
+  const ws = String(req.query.workspace_id ?? "default").trim() || "default";
+  const fmt = String(req.query.format ?? "json").toLowerCase();
+  if (fmt === "json") {
+    management.streamLibraryJsonExport(res, ws);
+    return;
+  }
+  if (fmt === "markdown" || fmt === "md") {
+    management.streamLibraryMarkdownZip(res, ws);
+    return;
+  }
+  res.status(400).json({ error: "format must be json or markdown" });
+});
+
 managementRouter.post("/import/backup", restoreUpload.single("file"), (req, res) => {
   const file = req.file;
   const cleanup = () => {

@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs";
 
 function req(name: string): string {
   const v = process.env[name];
@@ -32,5 +33,20 @@ export const config = {
   noteTemplate: (process.env.NOTE_TEMPLATE || "").trim(),
 
   apiRateLimitWindowMs: Math.max(1000, Number(process.env.API_RATE_WINDOW_MS) || 60_000),
-  apiRateLimitMax: Math.max(10, Number(process.env.API_RATE_MAX) || 300)
+  apiRateLimitMax: Math.max(10, Number(process.env.API_RATE_MAX) || 300),
+
+  /** Absolute paths to watch for new files (comma-separated). Only `add` is ingested. */
+  watchDirs: (process.env.BRAIN_WATCH_DIRS || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(p => path.resolve(process.cwd(), p))
+    .filter(p => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    }),
+  watchWorkspaceId: (process.env.BRAIN_WATCH_WORKSPACE_ID || "default").trim() || "default"
 };

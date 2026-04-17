@@ -6,6 +6,7 @@ export type Note = {
   updated_at: string;
   workspace_id?: string;
   inbox?: number;
+  chat_instruction?: string | null;
   tags?: string[];
 };
 
@@ -26,6 +27,7 @@ export type DocumentListItem = {
   created_at: string;
   workspace_id?: string;
   source_url?: string | null;
+  chat_instruction?: string | null;
 };
 
 export type Workspace = {
@@ -66,6 +68,7 @@ export type ChatSource = {
   chunk_index: number;
   label: string;
   excerpt: string;
+  page?: number | null;
 };
 
 export type LibrarySearchHit = {
@@ -76,6 +79,7 @@ export type LibrarySearchHit = {
   label: string;
   excerpt: string;
   excerpt_html?: string;
+  page?: number | null;
 };
 
 export type ChatResponse = {

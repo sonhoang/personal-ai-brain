@@ -66,8 +66,8 @@ export async function indexEmbeddingsForNote(noteId: string, title: string, body
   await storeEmbeddingsForChunks("note", noteId, chunks);
 }
 
-export async function indexEmbeddingsForDocument(docId: string, text: string): Promise<void> {
-  const chunks = chunkText(text);
+export async function indexEmbeddingsForDocument(docId: string, textOrChunks: string | string[]): Promise<void> {
+  const chunks = Array.isArray(textOrChunks) ? textOrChunks : chunkText(textOrChunks);
   await storeEmbeddingsForChunks("document", docId, chunks);
 }
 

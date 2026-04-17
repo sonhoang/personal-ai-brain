@@ -1,6 +1,8 @@
 import "dotenv/config";
 import app from "./app";
 import { config } from "./config";
+import { getDb } from "./db/database";
+import { startLibraryWatchers } from "./modules/library_watch/watch.service";
 import { acquireServerLock } from "./utils/serverLock";
 
 try {
@@ -9,6 +11,9 @@ try {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 }
+
+getDb();
+startLibraryWatchers();
 
 app.listen(config.port, () => {
   console.log(`API  http://127.0.0.1:${config.port}  (health + /api/*)`);

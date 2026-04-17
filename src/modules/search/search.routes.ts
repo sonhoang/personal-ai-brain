@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { searchLibrary } from "./search.service";
+import { searchLibrary, type SearchOptions } from "./search.service";
 
 export const searchRouter = Router();
 
@@ -13,7 +13,26 @@ searchRouter.get("/", async (req, res, next) => {
       res.json({ hits: [] });
       return;
     }
-    const hits = await searchLibrary(q, limit, ws);
+
+    const options: SearchOptions = {};
+    const st = String(req.query.type ?? "").toLowerCase();
+    if (st === "note" || st === "document") options.sourceType = st;
+    else options.sourceType = "all";
+
+    const tag = typeof req.query.tag === "string" ? req.query.tag : undefined;
+    if (tag?.trim()) options.tag = tag.trim();
+
+    if (req.query.inbox === "1" || req.query.inbox === "true") options.inboxOnly = true;
+
+    const df = typeof req.query.date_from === "string" ? req.query.date_from.trim() : "";
+    const dt = typeof req.query.date_to === "string" ? req.query.date_to.trim() : "";
+    if (df) options.dateFrom = df;
+    if (dt) options.dateTo = dt;
+
+    const sort = String(req.query.sort ?? "").toLowerCase();
+    if (sort === "recency" || sort === "recent") options.sort = "recency";
+
+    const hits = await searchLibrary(q, limit, ws, options);
     res.json({ hits });
   } catch (e) {
     next(e);
