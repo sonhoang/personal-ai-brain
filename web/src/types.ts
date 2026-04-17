@@ -35,6 +35,14 @@ export type Workspace = {
   created_at: string;
 };
 
+export type SavedSearch = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  query: string;
+  created_at: string;
+};
+
 export type ChatThread = {
   id: string;
   workspace_id: string;

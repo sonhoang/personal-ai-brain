@@ -1,6 +1,6 @@
 # Personal AI Brain (local-first)
 
-Single-user **personal** knowledge + chat, **one device** per library: everything stays on disk under `DATA_DIR` (default `./data`) — **SQLite**, **FTS5**, and **uploads**. Only **one server process** may use a given `DATA_DIR` at a time (lock file; see `.env.example` / `BRAIN_SKIP_LOCK`). One shared secret in `.env` protects the HTTP API. **Multi-device sync and sharing** are out of scope for this baseline — see **`future_Development.md`**.
+Single-user **personal** knowledge + chat, **one device** per library: everything stays on disk under `DATA_DIR` (default `./data`) — **SQLite**, **FTS5**, and **uploads**. Only **one server process** may use a given `DATA_DIR` at a time (lock file; see `.env.example` / `BRAIN_SKIP_LOCK`). One shared secret in `.env` protects the HTTP API. **Multi-device, continuous sync, and non-core UI enhancements** are out of scope for this baseline — see **`future_development.md`**.
 
 ## Principles
 
@@ -82,12 +82,13 @@ The UI is **React + TypeScript** under **`web/`** (Vite). The API remains usable
 
 ## Environment
 
-See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LLM_EMBEDDING_MODEL`** (semantic rerank), **`CHAT_CONTEXT_CHUNKS`**, **`FTS_CANDIDATE_CHUNKS`**, **`MAX_UPLOAD_MB`**, **`NOTE_TEMPLATE`**, **`API_RATE_*`**, **`PORT`**, **`DATA_DIR`**, **`BRAIN_SKIP_LOCK`**.
+See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LLM_EMBEDDING_MODEL`** (semantic rerank), **`CHAT_CONTEXT_CHUNKS`**, **`FTS_CANDIDATE_CHUNKS`**, **`MAX_UPLOAD_MB`**, **`BRAIN_MAX_RESTORE_ZIP_MB`**, **`NOTE_TEMPLATE`**, **`API_RATE_*`**, **`PORT`**, **`DATA_DIR`**, **`BRAIN_SKIP_LOCK`**.
 
 ## API (all under `/api`, Bearer required)
 
 - `GET /api/management/summary` — counts; **`llmConfigured`**, **`embeddingConfigured`**, **`dataDir`**.
 - `GET /api/management/export/backup` — downloads **`brain.sqlite`** + **`uploads/`** as a ZIP.
+- `POST /api/management/import/backup` — multipart **`file`** (`.zip` from export) + **`confirm_replace=yes`**; replaces DB + uploads (destructive). Idle the app first; optional **`BRAIN_MAX_RESTORE_ZIP_MB`** (default 512).
 - `GET|POST|PATCH|DELETE /api/workspaces` — notebooks; delete reassigns content to **`default`**.
 - `GET|POST|PATCH|DELETE /api/notes` — query **`workspace_id`**, **`inbox=1`**; **`POST /notes/daily`**, **`POST /notes/quick`**; **`GET /notes/:id/versions`**, **`POST /notes/:id/restore_version`**.
 - `GET|POST|DELETE /api/documents` — `POST` multipart **`file`** + **`workspace_id`**; types include `.pdf`, `.docx`, `.html`, `.rtf`. **`POST /documents/url`** JSON `{ url, workspace_id }`. **`POST /documents/zip`** multipart ZIP.
@@ -97,11 +98,11 @@ See `.env.example`. Required: **`BRAIN_PASSWORD`**. Optional: **`LLM_*`**, **`LL
 - `POST /api/chat` — body includes **`message`**, optional **`workspace_id`**, **`thread_id`**, **`focus`**. Appends to thread when **`thread_id`** set.
 - `POST /api/chat/stream` — same body as chat; **SSE** stream (`data: {"token"}` … `{"done":true,"sources"}`).
 
-**Single-device feature parity** (vs common reference apps) is tracked in **`development.md`**. **Sync, multi-device, sharing, and release** planning live in **`future_Development.md`**.
+**Core single-device features and gaps** are tracked in **`development.md`**. **Multi-device, sync, and UI enhancements** (only) live in **`future_development.md`**.
 
 ## Roadmap (from original spec)
 
-Later: OCR, cloud connectors, **`.doc` / Office** beyond current set, saved-search UI, true PWA offline, fuller a11y/i18n. Current stack: **workspaces**, URL/ZIP ingest, **HTML/RTF**, optional **embedding rerank**, **chat threads** + **streaming**, backup ZIP, rate limits — see **`development.md`**.
+Later: OCR, cloud connectors, **`.doc` / Office** beyond current set, true PWA offline, fuller a11y/i18n. Current stack: **workspaces**, URL/ZIP ingest, **HTML/RTF**, optional **embedding rerank**, **chat threads** + **streaming**, backup export/**restore**, **saved searches** (API + UI), **backlinks**, rate limits — see **`development.md`**.
 
 ## Migration from old spec
 

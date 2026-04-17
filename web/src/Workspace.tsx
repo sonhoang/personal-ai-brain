@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, clearToken, uploadDocument, uploadZip, downloadBackup, getToken } from "./api";
-import { mdToHtml } from "./md";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, clearToken, uploadDocument, uploadZip, downloadBackup, uploadBackupRestore, getToken } from "./api";
+import { extractWikiLinkTargets, mdToHtml } from "./md";
 import type {
   ChatResponse,
   ChatSource,
@@ -10,6 +10,7 @@ import type {
   ManagementSummary,
   Note,
   NoteVersion,
+  SavedSearch,
   Workspace
 } from "./types";
 
@@ -71,11 +72,27 @@ export function Workspace({ onLogout }: Props) {
   const [urlImport, setUrlImport] = useState("");
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
+  const backupRestoreInputRef = useRef<HTMLInputElement>(null);
   const wikiIndex = notes.map(n => ({ id: n.id, title: n.title || "Untitled" }));
+
+  const backlinks = useMemo(() => {
+    if (!activeNoteId) return [] as { id: string; title: string }[];
+    const target = (title.trim() || "Untitled").toLowerCase();
+    const out: { id: string; title: string }[] = [];
+    for (const n of notes) {
+      if (n.id === activeNoteId) continue;
+      const targets = extractWikiLinkTargets(n.body || "");
+      if (targets.some(t => t.toLowerCase() === target)) {
+        out.push({ id: n.id, title: n.title || "Untitled" });
+      }
+    }
+    return out;
+  }, [activeNoteId, title, notes]);
 
   const loadWorkspaces = useCallback(async () => {
     const r = await api<{ workspaces: Workspace[] }>("/workspaces");
@@ -103,6 +120,13 @@ export function Workspace({ onLogout }: Props) {
     setEmbedOn(Boolean(s.embeddingConfigured));
   }, [workspaceId]);
 
+  const loadSavedSearches = useCallback(async () => {
+    const r = await api<{ saved: SavedSearch[] }>(
+      `/saved-searches?workspace_id=${encodeURIComponent(workspaceId)}`
+    );
+    setSavedSearches(r.saved);
+  }, [workspaceId]);
+
   useEffect(() => {
     loadWorkspaces().catch(() => {});
   }, [loadWorkspaces]);
@@ -110,7 +134,8 @@ export function Workspace({ onLogout }: Props) {
   useEffect(() => {
     loadLibrary().catch(() => {});
     loadThreads().catch(() => {});
-  }, [loadLibrary, loadThreads]);
+    loadSavedSearches().catch(() => {});
+  }, [loadLibrary, loadThreads, loadSavedSearches]);
 
   useEffect(() => {
     const q = filter.trim();
@@ -273,6 +298,54 @@ export function Workspace({ onLogout }: Props) {
           md: `ZIP: imported **${out.imported}** file(s).${out.errors.length ? ` Warnings: ${out.errors.join("; ")}` : ""}`
         }
       ]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function saveNamedSearch() {
+    const q = filter.trim();
+    if (q.length < 2) {
+      alert("Enter a search in the top bar (2+ characters) before saving.");
+      return;
+    }
+    const name = window.prompt("Name for this saved search?", q.slice(0, 48));
+    if (!name?.trim()) return;
+    try {
+      await api<SavedSearch>("/saved-searches", {
+        method: "POST",
+        body: { workspace_id: workspaceId, name: name.trim(), query: q }
+      });
+      await loadSavedSearches();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function deleteNamedSearch(id: string) {
+    if (!confirm("Delete this saved search?")) return;
+    try {
+      await api(`/saved-searches/${id}`, { method: "DELETE" });
+      await loadSavedSearches();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function onRestoreBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (
+      !confirm(
+        "Replace this entire library with the backup ZIP? Current notes and documents on disk will be overwritten. Continue?"
+      )
+    ) {
+      return;
+    }
+    try {
+      await uploadBackupRestore(file);
+      window.location.reload();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -449,6 +522,21 @@ export function Workspace({ onLogout }: Props) {
           />
         </div>
         <div className="topbar-right">
+          <input
+            ref={backupRestoreInputRef}
+            type="file"
+            accept=".zip"
+            hidden
+            onChange={e => void onRestoreBackup(e)}
+          />
+          <button
+            type="button"
+            className="btn ghost"
+            title="Restore from a ZIP created by Backup"
+            onClick={() => backupRestoreInputRef.current?.click()}
+          >
+            Restore
+          </button>
           <button
             type="button"
             className="btn ghost"
@@ -539,6 +627,49 @@ export function Workspace({ onLogout }: Props) {
             >
               Upload ZIP
             </button>
+          </div>
+
+          <div className="source-section saved-searches-section">
+            <h3>Saved searches</h3>
+            <div className="saved-search-toolbar">
+              <button
+                type="button"
+                className="btn ghost tiny"
+                disabled={filter.trim().length < 2}
+                onClick={() => void saveNamedSearch()}
+              >
+                Save current
+              </button>
+            </div>
+            {savedSearches.length > 0 ? (
+              <ul className="source-list saved-search-list">
+                {savedSearches.map(s => (
+                  <li key={s.id}>
+                    <div className="saved-search-row">
+                      <button
+                        type="button"
+                        className="saved-search-run"
+                        title={s.query}
+                        onClick={() => setFilter(s.query)}
+                      >
+                        <span className="title">🔎 {s.name}</span>
+                        <span className="meta">{s.query}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost tiny saved-search-delete"
+                        aria-label={`Delete saved search ${s.name}`}
+                        onClick={() => void deleteNamedSearch(s.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="panel-sub tight">None yet — run a content search (2+ chars), then Save current.</p>
+            )}
           </div>
 
           {ftsHits.length > 0 ? (
@@ -661,6 +792,20 @@ export function Workspace({ onLogout }: Props) {
                   }}
                 />
               </div>
+              {backlinks.length > 0 ? (
+                <div className="backlinks-bar">
+                  <span className="backlinks-label">Backlinks</span>
+                  <ul className="backlinks-list">
+                    {backlinks.map(b => (
+                      <li key={b.id}>
+                        <button type="button" className="btn ghost tiny" onClick={() => void selectNote(b.id)}>
+                          {b.title}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="split-editor">
                 <textarea
                   className="note-body-input"

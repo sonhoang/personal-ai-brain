@@ -80,3 +80,19 @@ export async function downloadBackup(): Promise<void> {
   a.click();
   URL.revokeObjectURL(u);
 }
+
+/** Replaces brain.sqlite + uploads with a ZIP from GET /management/export/backup. Destructive. */
+export async function uploadBackupRestore(file: File): Promise<void> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("confirm_replace", "yes");
+  const r = await fetch("/api/management/import/backup", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + getToken() },
+    body: fd
+  });
+  const data = (await r.json().catch(() => ({}))) as { error?: string };
+  if (!r.ok) {
+    throw new Error(data.error || r.statusText || "Restore failed");
+  }
+}

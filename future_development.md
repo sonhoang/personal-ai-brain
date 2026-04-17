@@ -1,66 +1,45 @@
-# Future development — multi-device, sync, and release
+# Future development — multi-device, sync, and UI enhancements
 
-This document is for work **after** the **single-device** baseline in **`development.md`**. Nothing here is required to run the app today.
-
----
-
-## Goals (typical order)
-
-1. **Reliable backup** — one-click export/import of a library (archive `DATA_DIR` or logical export) so users can move machines manually before true sync exists.
-2. **Identity** — optional accounts (email/OAuth) if you move beyond `BRAIN_PASSWORD`, or device keys for E2E sync.
-3. **Multi-device sync** — same library on phone + laptop + tablet with conflict handling.
-4. **Sharing** — read-only links, shared workspaces, or comment-only collaborators (policy decision).
-5. **Hosted / team release** — multi-tenant or self-hosted server SKU, billing if applicable.
+Work that is **not** required for a single-machine “core brain.” **All functional gaps for one device** stay in **`development.md`**.
 
 ---
 
-## Multi-device sync — design axes
+## 1. Multi-device
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Folder / cloud drive** (user points Syncthing, iCloud, Dropbox at `DATA_DIR`) | Simple, no server | SQLite + WAL across OSes is fragile; need **exclusive use** or **export bundle** workflow |
-| **Dedicated sync service** | Safe merges, optional E2E | You operate or ship a sync server |
-| **CRDT / event log** | Great for notes text | Heavy engineering; documents/binary need separate strategy |
-| **“Primary device” + pull** | Simpler than bidirectional | Worse UX on secondary devices |
-
-**Likely path for this codebase:** keep **single-writer SQLite** per device; introduce **sync protocol** (upload/download snapshots or op-log) + **merge policy**; avoid two live writers on one file.
+- Same person, **multiple machines** (laptop + desktop + tablet) with one logical library.
+- **Device roles** (e.g. primary writer vs read-mostly) if you avoid concurrent SQLite writers.
+- **Conflict surfacing** when two devices edited the same note (merge UI, last-write-wins, or CRDT — product choice).
+- Optional **phone** client or **responsive** shell that assumes sync exists (see §2).
 
 ---
 
-## Sharing & collaboration (later)
+## 2. Sync
 
-- Workspace membership (owner, editor, viewer).
-- Share links with expiry; optional password on link.
-- Comment threads on notes or highlights (if you add highlights).
-- Real-time co-editing is **optional** and expensive; async + locking is easier.
-
----
-
-## Release & distribution
-
-- **Desktop:** Electron/Tauri wrapper, or documented “run Node + open browser.”
-- **Mobile:** native or Capacitor; sync becomes mandatory for good UX.
-- **Versioning:** semver API, migration scripts for SQLite schema.
-- **Update channel:** in-app update vs package managers.
+- **Protocol**: snapshot export/import, op-log replication, or hybrid — see `development.md` for **import restore** as core; sync is **continuous** reconciliation across devices.
+- **Transport**: your server, peer-to-peer, or encrypted blob store — not decided here.
+- **Identity** beyond `BRAIN_PASSWORD` (device keys, optional accounts) only if sync needs it.
+- **Shared libraries** (read-only or edit with others) are a **sync + policy** problem; defer until sync design exists.
 
 ---
 
-## Security when networked
+## 3. UI enhancements
 
-- TLS termination (reverse proxy).
-- Per-user auth, session rotation, CSRF for cookie-based UI if you drop Bearer-only.
-- Rate limits, upload quotas, audit log for shared instances.
-- Optional **E2E encryption** of note bodies / attachments (key management is hard; often deferred).
+Pure **presentation and ergonomics** (same features, nicer or more surfaces):
+
+- **Mobile / tablet** layouts beyond current breakpoint tweaks; gesture-friendly panes.
+- **PWA**: service worker, **offline** cache for shell + last session, “install app.”
+- **Accessibility**: full keyboard paths, focus order, ARIA on custom panes, contrast audit.
+- **Internationalization** (i18n): extract strings, locales, RTL if needed.
+- **Themes** (dark/light), density, font scale.
+- **Desktop shell**: Electron / Tauri wrapper (tray, file associations) if you want a “real app” binary.
+- **Saved searches UI** (API already exists): panel to save/run/delete named queries.
+- **Richer visualizations**: note **graph** / backlinks view, timeline, tag cloud (if not “logic” in `development.md`, treat as UI-only exploration of existing data).
+- **Streaming / thread UX polish**: typing indicators, abort, edit-last-message, copy/export thread.
+- **Onboarding**, empty states, inline help, and tutorial overlays.
 
 ---
 
-## What to pull from `development.md` when going multi-device
+## How to use this file
 
-Items that **block** sync or sharing if left local-only:
-
-- Note/document **identity** stable across devices (UUIDs already OK).
-- **Schema migrations** with backward compatibility.
-- **Conflict UI** (last-write-wins vs merge).
-- **Attachment deduplication** and large blob sync.
-
-Track concrete tickets here as you commit to a sync design; keep **`development.md`** focused on **single-device parity** with reference products.
+- If it touches **data model**, **sync**, or **multi-writer** semantics, start in **§1–2** and link from `development.md` only as a pointer.
+- If it is **look, feel, reachability, or device form factor**, use **§3**.

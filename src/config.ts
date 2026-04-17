@@ -26,6 +26,8 @@ export const config = {
   ftsCandidateChunks: Math.min(96, Math.max(8, Number(process.env.FTS_CANDIDATE_CHUNKS) || 48)),
 
   maxUploadMb: Math.min(200, Math.max(5, Number(process.env.MAX_UPLOAD_MB) || 40)),
+  /** Max ZIP size for POST /management/import/backup (full library restore). */
+  maxRestoreZipMb: Math.min(2048, Math.max(50, Number(process.env.BRAIN_MAX_RESTORE_ZIP_MB) || 512)),
   /** Comma-separated note template for new notes (optional). */
   noteTemplate: (process.env.NOTE_TEMPLATE || "").trim(),
 

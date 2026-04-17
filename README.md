@@ -6,5 +6,5 @@ Local-first notes + documents + RAG chat (SQLite, FTS5, OpenAI-compatible LLM) w
 
 **Start everything (dev):** from repo root, after `npm install` and `cd web && npm install`, run **`npm run start:all`** (same as `npm run dev`) — API on port **3030**, UI at **http://127.0.0.1:5173**.
 
-**Single-device backlog (parity checklist):** **[development.md](./development.md)**.  
-**Multi-device, sync, sharing, releases:** **[future_Development.md](./future_Development.md)**.
+**Core backlog (single device):** **[development.md](./development.md)**.  
+**Multi-device, sync, UI enhancements:** **[future_development.md](./future_development.md)**.
